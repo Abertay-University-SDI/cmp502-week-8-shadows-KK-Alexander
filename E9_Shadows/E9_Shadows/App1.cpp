@@ -35,9 +35,13 @@ void App1::init(HINSTANCE hinstance, HWND hwnd, int screenWidth, int screenHeigh
 	light = new Light();
 	light->setAmbientColour(0.3f, 0.3f, 0.3f, 1.0f);
 	light->setDiffuseColour(1.0f, 1.0f, 1.0f, 1.0f);
-	light->setDirection(0.0f, -0.7f, 0.7f);
-	light->setPosition(0.f, 0.f, -10.f);
+	light->setDirection(lightDir[0], lightDir[1], lightDir[2]);
+	light->setPosition(lightPos[0], lightPos[1], lightPos[2]);
 	light->generateOrthoMatrix((float)sceneWidth, (float)sceneHeight, 0.1f, 100.f);
+
+	//sMapData = new OrthoMesh(renderer->getDevice(), renderer->getDeviceContext(), screenWidth, screenHeight, 0, 0);
+	cubeMesh = new CubeMesh(renderer->getDevice(), renderer->getDeviceContext());
+	sphereMesh = new SphereMesh(renderer->getDevice(), renderer->getDeviceContext());
 
 }
 
@@ -60,6 +64,32 @@ bool App1::frame()
 	{
 		return false;
 	}
+
+	if (cubeXMinus) {
+		cubeXPos -= 0.1;
+		if (cubeXPos <= -7.5) {
+			cubeXMinus = false;
+		}
+	}
+	else {
+		cubeXPos += 0.1;
+		if (cubeXPos >= 7.5) {
+			cubeXMinus = true;
+		}
+	}
+
+	if (sphereYMinus) {
+		sphereYPos -= 0.05;
+		if (sphereYPos <= 5.f) {
+			sphereYMinus = false;
+		}
+	}
+	else {
+		sphereYPos += 0.05;
+		if (sphereYPos >= 10.0) {
+			sphereYMinus = true;
+		}
+	}
 	
 	// Render the graphics.
 	result = render();
@@ -73,6 +103,8 @@ bool App1::frame()
 
 bool App1::render()
 {
+	light->setDirection(lightDir[0], lightDir[1], lightDir[2]);
+	light->setPosition(lightPos[0], lightPos[1], lightPos[2]);
 
 	// Perform depth pass
 	depthPass();
@@ -108,6 +140,21 @@ void App1::depthPass()
 	depthShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, lightViewMatrix, lightProjectionMatrix);
 	depthShader->render(renderer->getDeviceContext(), model->getIndexCount());
 
+	//worldMatrix = XMMatrixTranslation(7.5f, 2.5f, 7.5f);
+	worldMatrix = XMMatrixTranslation(cubeXPos, 2.5f, 7.5f);
+	scaleMatrix = XMMatrixScaling(5.f, 5.f, 5.f);
+	worldMatrix = XMMatrixMultiply(worldMatrix, scaleMatrix);
+	cubeMesh->sendData(renderer->getDeviceContext());
+	depthShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, lightViewMatrix, lightProjectionMatrix);
+	depthShader->render(renderer->getDeviceContext(), cubeMesh->getIndexCount());
+
+	worldMatrix = XMMatrixTranslation(0.f, sphereYPos, 2.5f);
+	scaleMatrix = XMMatrixScaling(2.f, 2.f, 2.f);
+	worldMatrix = XMMatrixMultiply(worldMatrix, scaleMatrix);
+	sphereMesh->sendData(renderer->getDeviceContext());
+	depthShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, lightViewMatrix, lightProjectionMatrix);
+	depthShader->render(renderer->getDeviceContext(), sphereMesh->getIndexCount());
+
 	// Set back buffer as render target and reset view port.
 	renderer->setBackBufferRenderTarget();
 	renderer->resetViewport();
@@ -140,6 +187,23 @@ void App1::finalPass()
 	shadowShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, textureMgr->getTexture(L"brick"), shadowMap->getDepthMapSRV(), light);
 	shadowShader->render(renderer->getDeviceContext(), model->getIndexCount());
 
+	
+	//worldMatrix = XMMatrixTranslation(7.5f, 2.5f, 7.5f);
+	worldMatrix = XMMatrixTranslation(cubeXPos, 2.5f, 7.5f);
+	scaleMatrix = XMMatrixScaling(5.f, 5.f, 5.f);
+	worldMatrix = XMMatrixMultiply(worldMatrix, scaleMatrix);
+	cubeMesh->sendData(renderer->getDeviceContext());
+	shadowShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, textureMgr->getTexture(L"brick"), shadowMap->getDepthMapSRV(), light);
+	shadowShader->render(renderer->getDeviceContext(), cubeMesh->getIndexCount());
+
+	worldMatrix = XMMatrixTranslation(0.f, sphereYPos, 2.5f);
+	scaleMatrix = XMMatrixScaling(2.f, 2.f, 2.f);
+	worldMatrix = XMMatrixMultiply(worldMatrix, scaleMatrix);
+	sphereMesh->sendData(renderer->getDeviceContext());
+	shadowShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, textureMgr->getTexture(L"brick"), shadowMap->getDepthMapSRV(), light);
+	shadowShader->render(renderer->getDeviceContext(), sphereMesh->getIndexCount());
+
+
 	gui();
 	renderer->endScene();
 }
@@ -156,6 +220,10 @@ void App1::gui()
 	// Build UI
 	ImGui::Text("FPS: %.2f", timer->getFPS());
 	ImGui::Checkbox("Wireframe mode", &wireframeToggle);
+
+	ImGui::SliderFloat3("Light Position", lightPos, 0.0f, 100.0f);
+	ImGui::SliderFloat3("Light Direction", lightDir, 0.0f, 100.0f);
+
 
 	// Render UI
 	ImGui::Render();
